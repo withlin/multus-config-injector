@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: multus-cni-config-injector-service
+  namespace: kube-system
+spec:
+  ports:
+    - port: 9443
+      targetPort: 9443
+  selector:
+    app: multus-cni-config-injector

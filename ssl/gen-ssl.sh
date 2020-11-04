@@ -1,10 +1,9 @@
 if [ ! $yce_dev_ip ]; then
   HOSTS='[
-        "kube-webhook-service",
-        "kube-webhook-service.kube-system",
-        "kube-webhook-service.kube-system.svc",
-        "kube-webhook-service.kube-system.svc:1443",
-        "kube-controller-manager-metrics-service.kube-system.svc"
+        "multus-cni-config-injector-service",
+        "multus-cni-config-injector-service.kube-system",
+        "multus-cni-config-injector-service.kube-system.svc",
+        "multus-cni-config-injector-service.kube-system.svc:9443"
         ]'
 else
   # shellcheck disable=SC2016

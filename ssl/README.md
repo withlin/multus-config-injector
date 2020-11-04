@@ -9,7 +9,7 @@
 ## 当是开发换环境的时候需要自定义变量
 
 ```sh
-export yce_dev_ip=10.1.190.82 //当项目名称改变的时候，可以更改yce_dev_ip.需要去gen-ssl更改，其为你调试的本地ip
+export yce_dev_ip=10.1.190.82  //当项目名称改变的时候，可以更改yce_dev_ip.需要去gen-ssl更改，其为你调试的本地ip
 export COUNTRY=CN
 export CITY=GuangZhou
 ```

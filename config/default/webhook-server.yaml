@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multus-cni-config-injector
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multus-cni-config-injector
+  template:
+    metadata:
+      labels:
+        app: multus-cni-config-injector
+    spec:
+      containers:
+        - name: multus-cni-config-injector
+          image: yametech/multus-cni-config-injector:v1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9443
+              name: webhook-server
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /ssl/
+              name: cert
+              readOnly: true
+      volumes:
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: multus-cni-config-injector-secret

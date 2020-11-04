@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/go-logr/logr"
 	"gomodules.xyz/jsonpatch/v2"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -46,14 +46,13 @@ const (
 // +kubebuilder:object:root=false
 // +k8s:deepcopy-gen=false
 type WebhookServer struct {
-	Log           logr.Logger
 	DynamicClient dynamic.Interface
 }
 
 var ingoredList []string = []string{
-	//"kube-system",
-	//"default",
-	//"kube-public",
+	"kube-system",
+	"default",
+	"kube-public",
 }
 
 func toAdmissionResponse(err error) *v1beta1.AdmissionResponse {
@@ -103,7 +102,7 @@ func (p *WebhookServer) serve(w http.ResponseWriter, r *http.Request, admit admi
 	// verify the content type is accurate
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "application/json" {
-		p.Log.Error(
+		log.Println(
 			fmt.Errorf(
 				"context type is non expect error, value: %v", contentType),
 			"",
@@ -132,11 +131,11 @@ func (p *WebhookServer) serve(w http.ResponseWriter, r *http.Request, admit admi
 
 	resp, err := json.Marshal(response)
 	if err != nil {
-		p.Log.Error(err, "")
+		log.Println(err, "")
 	}
 
 	if _, err := w.Write(resp); err != nil {
-		p.Log.Error(err, "")
+		log.Println(err, "")
 	}
 }
 
@@ -162,12 +161,13 @@ func removeRepeatedElement(arr []string) (newArr []string) {
 }
 
 func (p *WebhookServer) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	log.Println("--------------->mutate multus cni  config  request is comming")
 	reviewResponse := &v1beta1.AdmissionResponse{}
 	reviewResponse.Allowed = true
 
 	if ar.Request.Resource != podGvr {
 		err := fmt.Errorf("expect resource to be %s", podGvr)
-		p.Log.Error(err, "")
+		log.Println(err, "")
 		return toAdmissionResponse(err)
 	}
 
@@ -175,7 +175,7 @@ func (p *WebhookServer) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.
 	pod := corev1.Pod{}
 
 	if _, _, err := deserializer.Decode(raw, nil, &pod); err != nil {
-		p.Log.Error(err, "")
+		log.Println(err, "")
 		return toAdmissionResponse(err)
 	}
 
@@ -201,6 +201,7 @@ func (p *WebhookServer) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.
 
 	cniValue, ok := result[annotationsMultusCniKey].(string)
 	if !ok {
+		log.Println("warn: cni value to string :")
 		return reviewResponse
 	}
 
@@ -210,6 +211,7 @@ func (p *WebhookServer) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.
 	}
 	podCopyAnnos[annotationsMultusCniKey] = cniValue
 	podCopy.Annotations = podCopyAnnos
+	log.Println("podCopy Annotations:",podCopy.Annotations)
 
 	// TODO: investigate why GetGenerateName doesn't work
 	podCopyJSON, err := json.Marshal(podCopy)
@@ -252,8 +254,13 @@ func (p *WebhookServer) lookUpOwnerReference(ownerReferences []metav1.OwnerRefer
 				return nil, err
 			}
 
-			cniNetWork := unstructuredObj["metadata"].(map[string]interface{})["annotations"].(map[string]interface{})[annotationsMultusCniKey]
+			annos,ok:= unstructuredObj["metadata"].(map[string]interface{})["annotations"].(map[string]interface{})
+			if !ok {
+				return nil,nil
+			}
+			cniNetWork := annos[annotationsMultusCniKey]
 			if cniNetWork != nil {
+				log.Println("find  k8s.v1.cni.cncf.io/networks Annotations:",cniNetWork)
 				result := make(map[string]interface{}, 1)
 				result[annotationsMultusCniKey] = cniNetWork
 				return result, nil

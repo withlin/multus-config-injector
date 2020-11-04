@@ -17,8 +17,8 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -30,13 +30,11 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	// +kubebuilder:scaffold:imports
 )
 
 var (
 	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
 	sslDir   = "./ssl"
 )
 
@@ -46,54 +44,30 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
-func podMutatingServe(pod *webhookv1.WebhookServer) {
+func podMutatingServe(pod *webhookv1.WebhookServer) error {
 	certFile := fmt.Sprintf("%s%s", sslDir, "/tls.crt")
 	keyFile := fmt.Sprintf("%s%s", sslDir, "/tls.key")
 
-	pod.Log.Info("start webhooks", "certFile", certFile, "keyFile", keyFile)
+	log.Println("start webhooks", "certFile", certFile, "keyFile", keyFile)
 
-	http.HandleFunc("/injector-mutating-pods", pod.ServeInjectorMutatePods)
-
-	if err := http.ListenAndServeTLS(":1443", certFile, keyFile, nil); err != nil {
-		panic(err)
+	http.HandleFunc("/multus-cni-config-pods", pod.ServeInjectorMutatePods)
+	if err := http.ListenAndServeTLS(":9443", certFile, keyFile, nil); err != nil {
+		return err
 	}
+	return  nil
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8081", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	flag.Parse()
-
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
-
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		Port:               9443,
-		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "e57d07f4.yce.nip.io",
-	})
-	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
 
 	dynamicClient, err := dynamic.NewForConfig(ctrl.GetConfigOrDie())
 	if err != nil {
-		setupLog.Error(err, "unable to init dynamic client")
+		log.Println(err, "unable to init dynamic client")
 		os.Exit(1)
 	}
 
-	// +kubebuilder:scaffold:builder
-	go podMutatingServe(&webhookv1.WebhookServer{DynamicClient: dynamicClient, Log: ctrl.Log.WithName("webhook").WithName("pod webhook")})
-
-	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+	err =podMutatingServe(&webhookv1.WebhookServer{DynamicClient: dynamicClient})
+	if err != nil{
+		log.Println(err, "unable to start webhook server")
 		os.Exit(1)
 	}
 }
