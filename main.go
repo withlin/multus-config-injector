@@ -89,7 +89,7 @@ func main() {
 	}
 
 	// +kubebuilder:scaffold:builder
-	go podMutatingServe(&webhookv1.WebhookServer{Client: mgr.GetClient(), DynamicClient: dynamicClient, Log: ctrl.Log.WithName("webhook").WithName("pod webhook")})
+	go podMutatingServe(&webhookv1.WebhookServer{DynamicClient: dynamicClient, Log: ctrl.Log.WithName("webhook").WithName("pod webhook")})
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

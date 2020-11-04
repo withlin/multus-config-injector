@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/dynamic"
 	kscheme "k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
@@ -47,7 +46,6 @@ const (
 // +kubebuilder:object:root=false
 // +k8s:deepcopy-gen=false
 type WebhookServer struct {
-	Client        client.Client
 	Log           logr.Logger
 	DynamicClient dynamic.Interface
 }
