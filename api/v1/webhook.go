@@ -13,43 +13,26 @@ import (
 	"gomodules.xyz/jsonpatch/v2"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	apiextensionsapi "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	//"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/dynamic"
-	kscheme "k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
-var schemePod = runtime.NewScheme()
 
-var (
-	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "yce.nip.io", Version: "v1"}
-
-	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
-	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
-
-	// AddToScheme adds the types in this group-version to the given scheme.
-	AddToScheme = SchemeBuilder.AddToScheme
-
-	// podScheme = runtime.NewScheme()
-)
 
 const (
 	annotationsMultusCniKey = "k8s.v1.cni.cncf.io/networks"
 )
 
-// +kubebuilder:object:root=false
-// +k8s:deepcopy-gen=false
 type WebhookServer struct {
 	DynamicClient dynamic.Interface
 }
 
-var ingoredList []string = []string{
+//TODO:just like istio,label to namespace: multus-cni-config=enabled,which will injector cni config
+var ingoredList = []string{
 	"kube-system",
 	"default",
 	"kube-public",
@@ -143,22 +126,7 @@ func (p *WebhookServer) ServeInjectorMutatePods(w http.ResponseWriter, r *http.R
 	p.serve(w, r, p.injectorMutatePods)
 }
 
-func removeRepeatedElement(arr []string) (newArr []string) {
-	newArr = make([]string, 0)
-	for i := 0; i < len(arr); i++ {
-		repeat := false
-		for j := i + 1; j < len(arr); j++ {
-			if arr[i] == arr[j] {
-				repeat = true
-				break
-			}
-		}
-		if !repeat {
-			newArr = append(newArr, arr[i])
-		}
-	}
-	return
-}
+
 
 func (p *WebhookServer) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	log.Println("--------------->mutate multus cni  config  request is comming")
@@ -179,9 +147,11 @@ func (p *WebhookServer) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.
 		return toAdmissionResponse(err)
 	}
 
+	//TODO: according multus-cni-config-injection=enabled to namespace will injection
 	if !ignoredRequired(ar.Request.Namespace) {
 		return reviewResponse
 	}
+
 
 	podCopy := pod.DeepCopy()
 
@@ -294,10 +264,4 @@ func (p *WebhookServer) lookUpOwnerReference(ownerReferences []metav1.OwnerRefer
 		}
 	}
 	return nil, nil
-}
-
-func init() {
-	_ = apiextensionsapi.AddToScheme(schemePod)
-	_ = kscheme.AddToScheme(schemePod)
-	_ = AddToScheme(schemePod)
 }

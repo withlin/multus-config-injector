@@ -48,8 +48,7 @@ func podMutatingServe(pod *webhookv1.WebhookServer) error {
 	certFile := fmt.Sprintf("%s%s", sslDir, "/tls.crt")
 	keyFile := fmt.Sprintf("%s%s", sslDir, "/tls.key")
 
-	log.Println("start webhooks", "certFile", certFile, "keyFile", keyFile)
-
+	log.Println("------>start webhooks,and listen :9443 port and", "certFile dir  is ", certFile, "keyFile dir is", keyFile)
 	http.HandleFunc("/multus-cni-config-pods", pod.ServeInjectorMutatePods)
 	if err := http.ListenAndServeTLS(":9443", certFile, keyFile, nil); err != nil {
 		return err
