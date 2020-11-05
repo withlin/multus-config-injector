@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"os"
 
-	webhookv1 "github.com/withlin/multus-config-injector/api/v1"
 	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,7 +43,7 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
-func podMutatingServe(pod *webhookv1.WebhookServer) error {
+func podMutatingServe(pod *WebhookServer) error {
 	certFile := fmt.Sprintf("%s%s", sslDir, "/tls.crt")
 	keyFile := fmt.Sprintf("%s%s", sslDir, "/tls.key")
 
@@ -64,7 +63,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	err =podMutatingServe(&webhookv1.WebhookServer{DynamicClient: dynamicClient})
+	err =podMutatingServe(&WebhookServer{DynamicClient: dynamicClient})
 	if err != nil{
 		log.Println(err, "unable to start webhook server")
 		os.Exit(1)
