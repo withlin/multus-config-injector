@@ -114,11 +114,11 @@ func (p *WebhookServer) serve(w http.ResponseWriter, r *http.Request, admit admi
 
 	resp, err := json.Marshal(response)
 	if err != nil {
-		log.Println(err, "")
+		log.Println(err)
 	}
 
 	if _, err := w.Write(resp); err != nil {
-		log.Println(err, "")
+		log.Println(err)
 	}
 }
 
@@ -183,7 +183,6 @@ func (p *WebhookServer) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.
 	podCopy.Annotations = podCopyAnnos
 	log.Println("podCopy Annotations:",podCopy.Annotations)
 
-	// TODO: investigate why GetGenerateName doesn't work
 	podCopyJSON, err := json.Marshal(podCopy)
 	if err != nil {
 		return toAdmissionResponse(err)
