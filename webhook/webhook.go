@@ -1,4 +1,4 @@
-package main
+package webhook
 
 import (
 	"encoding/json"
@@ -21,13 +21,15 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-
-
 const (
 	annotationsMultusCniKey = "k8s.v1.cni.cncf.io/networks"
 )
 
-type WebhookServer struct {
+var (
+	result = make(map[string]interface{}, 1)
+)
+
+type MultusWebhook struct {
 	DynamicClient dynamic.Interface
 }
 
@@ -73,7 +75,7 @@ type admitFunc func(v1beta1.AdmissionReview) *v1beta1.AdmissionResponse
 //type validateFunc func(ar *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse
 
 // TODO: Only support Create Event,Not Support Update Event.Next version will Support it
-func (p *WebhookServer) serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
+func (p *MultusWebhook) serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	var body []byte
 	if r.Body != nil {
 		if data, err := ioutil.ReadAll(r.Body); err == nil {
@@ -122,13 +124,11 @@ func (p *WebhookServer) serve(w http.ResponseWriter, r *http.Request, admit admi
 	}
 }
 
-func (p *WebhookServer) ServeInjectorMutatePods(w http.ResponseWriter, r *http.Request) {
+func (p *MultusWebhook) ServeInjectorMutatePods(w http.ResponseWriter, r *http.Request) {
 	p.serve(w, r, p.injectorMutatePods)
 }
 
-
-
-func (p *WebhookServer) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+func (p *MultusWebhook) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	log.Println("--------------->mutate multus cni  config  request is comming")
 	reviewResponse := &v1beta1.AdmissionResponse{}
 	reviewResponse.Allowed = true
@@ -151,7 +151,6 @@ func (p *WebhookServer) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.
 	if !ignoredRequired(ar.Request.Namespace) {
 		return reviewResponse
 	}
-
 
 	podCopy := pod.DeepCopy()
 
@@ -181,7 +180,7 @@ func (p *WebhookServer) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.
 	}
 	podCopyAnnos[annotationsMultusCniKey] = cniValue
 	podCopy.Annotations = podCopyAnnos
-	log.Println("podCopy Annotations:",podCopy.Annotations)
+	log.Println("------>podCopy Annotations:", podCopy.Annotations)
 
 	podCopyJSON, err := json.Marshal(podCopy)
 	if err != nil {
@@ -207,7 +206,8 @@ func (p *WebhookServer) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.
 	return reviewResponse
 }
 
-func (p *WebhookServer) lookUpOwnerReference(ownerReferences []metav1.OwnerReference, namespace string) (map[string]interface{}, error) {
+func (p *MultusWebhook) lookUpOwnerReference(ownerReferences []metav1.OwnerReference, namespace string) (map[string]interface{}, error) {
+
 	if len(ownerReferences) > 0 {
 		for _, or := range ownerReferences {
 
@@ -223,44 +223,40 @@ func (p *WebhookServer) lookUpOwnerReference(ownerReferences []metav1.OwnerRefer
 				return nil, err
 			}
 
-			annos,ok:= unstructuredObj["metadata"].(map[string]interface{})["annotations"].(map[string]interface{})
-			if !ok {
-				return nil,nil
-			}
-			cniNetWork := annos[annotationsMultusCniKey]
-			if cniNetWork != nil {
-				log.Println("find  k8s.v1.cni.cncf.io/networks Annotations:",cniNetWork)
-				result := make(map[string]interface{}, 1)
-				result[annotationsMultusCniKey] = cniNetWork
-				return result, nil
-			}
-
 			orMap, ok := unstructuredObj["metadata"].(map[string]interface{})["ownerReferences"].([]interface{})
 			if !ok {
-				return nil, nil
-			}
-			if len(orMap) == 0 {
-				return nil, err
-			}
-
-			var ors []metav1.OwnerReference
-			for _, or := range orMap {
-				result, ok := or.(map[string]interface{})
+				annos, ok := unstructuredObj["metadata"].(map[string]interface{})["annotations"].(map[string]interface{})
 				if !ok {
 					return nil, nil
 				}
-				or := metav1.OwnerReference{}
-				or.APIVersion = result["apiVersion"].(string)
-				or.Kind = result["kind"].(string)
-				or.Name = result["name"].(string)
-				ors = append(ors, or)
-			}
+				cniNetWork := annos[annotationsMultusCniKey]
+				if cniNetWork != nil {
+					log.Println("find  k8s.v1.cni.cncf.io/networks Annotations:", cniNetWork)
 
-			if len(ors) > 0 {
-				p.lookUpOwnerReference(ors, namespace)
+					result[annotationsMultusCniKey] = cniNetWork
+					return result, nil
+				}
+			}
+			if len(orMap) > 0 {
+				var ors []metav1.OwnerReference
+				for _, or := range orMap {
+					result, ok := or.(map[string]interface{})
+					if !ok {
+						return nil, nil
+					}
+					or := metav1.OwnerReference{}
+					or.APIVersion = result["apiVersion"].(string)
+					or.Kind = result["kind"].(string)
+					or.Name = result["name"].(string)
+					ors = append(ors, or)
+				}
+
+				if len(ors) > 0 {
+					p.lookUpOwnerReference(ors, namespace)
+				}
 			}
 
 		}
 	}
-	return nil, nil
+	return result, nil
 }
