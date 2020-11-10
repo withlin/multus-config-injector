@@ -25,9 +25,7 @@ const (
 	annotationsMultusCniKey = "k8s.v1.cni.cncf.io/networks"
 )
 
-var (
-	result = make(map[string]interface{}, 1)
-)
+
 
 type MultusWebhook struct {
 	DynamicClient dynamic.Interface
@@ -160,7 +158,7 @@ func (p *MultusWebhook) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.
 			return reviewResponse
 		}
 	}
-	result, err := p.lookUpOwnerReference(podCopy.OwnerReferences, ar.Request.Namespace)
+	result,err := p.lookUpOwnerReference(podCopy.OwnerReferences, ar.Request.Namespace)
 	if err != nil {
 		return reviewResponse
 	}
@@ -206,7 +204,7 @@ func (p *MultusWebhook) injectorMutatePods(ar v1beta1.AdmissionReview) *v1beta1.
 	return reviewResponse
 }
 
-func (p *MultusWebhook) lookUpOwnerReference(ownerReferences []metav1.OwnerReference, namespace string) (map[string]interface{}, error) {
+func (p *MultusWebhook) lookUpOwnerReference(ownerReferences []metav1.OwnerReference, namespace string) (map[string]interface{},error) {
 
 	if len(ownerReferences) > 0 {
 		for _, or := range ownerReferences {
@@ -220,7 +218,7 @@ func (p *MultusWebhook) lookUpOwnerReference(ownerReferences []metav1.OwnerRefer
 			}
 			unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 			if err != nil {
-				return nil, err
+				return  nil,err
 			}
 
 			orMap, ok := unstructuredObj["metadata"].(map[string]interface{})["ownerReferences"].([]interface{})
@@ -232,7 +230,7 @@ func (p *MultusWebhook) lookUpOwnerReference(ownerReferences []metav1.OwnerRefer
 				cniNetWork := annos[annotationsMultusCniKey]
 				if cniNetWork != nil {
 					log.Println("find  k8s.v1.cni.cncf.io/networks Annotations:", cniNetWork)
-
+					result := make(map[string]interface{}, 1)
 					result[annotationsMultusCniKey] = cniNetWork
 					return result, nil
 				}
@@ -252,11 +250,15 @@ func (p *MultusWebhook) lookUpOwnerReference(ownerReferences []metav1.OwnerRefer
 				}
 
 				if len(ors) > 0 {
-					p.lookUpOwnerReference(ors, namespace)
+					result,err:=p.lookUpOwnerReference(ors, namespace)
+					if err!= nil {
+						return nil,err
+					}
+					return result,nil
 				}
 			}
 
 		}
 	}
-	return result, nil
+	return nil, nil
 }
